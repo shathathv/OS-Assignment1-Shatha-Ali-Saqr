@@ -30,6 +30,8 @@ class Process implements Runnable {
     private int timeQuantum; // Time slice (time quantum) allowed per CPU access (in milliseconds)
     private int remainingTime;
     private int priority;
+    private long waitingTime = 0;
+private long queueEntryTime;
      // Time left for the process to finish its execution
 
     // Constructor to initialize the process with name, burst time, and time quantum
@@ -139,6 +141,7 @@ class Process implements Runnable {
     public int getRemainingTime() {
         return remainingTime;
     }
+    
 
     // Check if the process has finished (i.e., no remaining time)
     public boolean isFinished() {
@@ -150,10 +153,25 @@ class Process implements Runnable {
 public int getPriority() {
     return priority;
 }
+public void setQueueEntryTime(long time) {
+    this.queueEntryTime = time;
+}
+
+public long getQueueEntryTime() {
+    return queueEntryTime;
+}
+public long getWaitingTime() {
+    return waitingTime;
+}
+
+public void setWaitingTime(long waitingTime) {
+    this.waitingTime = waitingTime;
+}
 
 }
 
 public class SchedulerSimulation {
+    static int contextSwitchCount = 0;
     public static void main(String[] args) {
         // ⚠️ IMPORTANT: Put your student ID here to seed the random number generator
         // This makes your output unique to you - DO NOT forget to change this!
@@ -248,7 +266,16 @@ public class SchedulerSimulation {
             System.out.println(Colors.BOLD + Colors.MAGENTA + "└" + "─".repeat(79) + Colors.RESET + "\n");
             
             // Start the thread, which will run the process for one time quantum
-            currentThread.start();
+            Process currentProcess = processMap.get(currentThread);
+
+currentProcess.setWaitingTime(
+    currentProcess.getWaitingTime()
+    + (System.currentTimeMillis() - currentProcess.getQueueEntryTime())
+);
+
+contextSwitchCount++;
+currentThread.start();
+          
             
             try {
                 // Wait for the thread to finish its time quantum before continuing to the next process
@@ -259,6 +286,10 @@ public class SchedulerSimulation {
             
             // Retrieve the process associated with the thread from the map
             Process process = processMap.get(currentThread);
+            process.setWaitingTime(
+    process.getWaitingTime()
+    + (System.currentTimeMillis() - process.getQueueEntryTime())
+);
             
             // Check if the process is not finished
             if (!process.isFinished()) {
@@ -287,6 +318,29 @@ public class SchedulerSimulation {
         System.out.println(Colors.BOLD + Colors.BRIGHT_GREEN + 
                           "╚════════════════════════════════════════════════════════════════════════════════╝" + 
                           Colors.RESET + "\n");
+        System.out.println("Total Context Switches: " + contextSwitchCount);
+        System.out.println();
+System.out.println("==============================================================");
+System.out.println("                    FINAL PROCESS TABLE");
+System.out.println("==============================================================");
+System.out.printf("%-10s %-15s %-18s %-18s%n",
+        "Process", "Burst Time", "Waiting Time", "Turnaround Time");
+System.out.println("--------------------------------------------------------------");
+
+for (Process p : new java.util.HashSet<>(processMap.values())) {
+    long waitingTime = p.getWaitingTime();
+    long turnaroundTime = waitingTime + p.getBurstTime();
+
+    System.out.printf("%-10s %-15d %-18d %-18d%n",
+            p.getName(),
+            p.getBurstTime(),
+            waitingTime,
+            turnaroundTime);
+}
+
+System.out.println("==============================================================");
+System.out.println("Total Context Switches: " + contextSwitchCount);
+
     }
     
     // Method to add a process to the queue and map, while printing a "ready" message
@@ -297,6 +351,8 @@ public class SchedulerSimulation {
         
         // Add the thread to the ready queue
         processQueue.add(thread);
+
+        process.setQueueEntryTime(System.currentTimeMillis());
         
         // Map the thread to the process, so we can track the process associated with each thread
         processMap.put(thread, process);
